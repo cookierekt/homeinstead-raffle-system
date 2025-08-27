@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: home-instead-raffle-dashboard
+    env: python
+    buildCommand: pip install -r requirements-production.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: APP_NAME
+        value: Home Instead Raffle Dashboard
+      - key: COMPANY_NAME
+        value: Home Instead Senior Care
+      - key: MAX_FILE_SIZE
+        value: "5242880"
+      - key: SESSION_TIMEOUT
+        value: "1800000"
+      - key: MAX_LOGIN_ATTEMPTS
+        value: "3"
+      - key: LOCKOUT_TIME
+        value: "900000"
+      - key: ENABLE_PHOTO_UPLOADS
+        value: "true"
+      - key: ENABLE_EXCEL_IMPORT
+        value: "true"
+      - key: ENABLE_PDF_EXPORT
+        value: "true"

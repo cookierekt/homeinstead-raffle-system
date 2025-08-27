@@ -1,0 +1,25 @@
+{
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "deploy": {
+    "startCommand": "gunicorn app:app",
+    "restartPolicyType": "ON_FAILURE"
+  },
+  "environments": {
+    "production": {
+      "variables": {
+        "NODE_ENV": "production",
+        "APP_NAME": "Home Instead Raffle Dashboard",
+        "COMPANY_NAME": "Home Instead Senior Care",
+        "MAX_FILE_SIZE": "5242880",
+        "SESSION_TIMEOUT": "1800000",
+        "MAX_LOGIN_ATTEMPTS": "3",
+        "LOCKOUT_TIME": "900000",
+        "ENABLE_PHOTO_UPLOADS": "true",
+        "ENABLE_EXCEL_IMPORT": "true",
+        "ENABLE_PDF_EXPORT": "true"
+      }
+    }
+  }
+}

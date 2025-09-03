@@ -19,22 +19,30 @@ app.config.from_object(config[config_name])
 
 # Initialize rate limiter
 limiter = Limiter(
-    app,
     key_func=get_remote_address,
     default_limits=["100 per hour"]
 )
+limiter.init_app(app)
 
-# Create necessary directories
-os.makedirs(app.config['UPLOAD_PATH'], exist_ok=True)
-os.makedirs('data', exist_ok=True)
-os.makedirs('backups', exist_ok=True)
+# Create necessary directories with error handling
+try:
+    os.makedirs(app.config['UPLOAD_PATH'], exist_ok=True)
+    os.makedirs('data', exist_ok=True)
+    os.makedirs('backups', exist_ok=True)
+except Exception as e:
+    print(f"Warning: Could not create directories: {e}")
 
-# Initialize database
-db_manager = DatabaseManager()
-
-# Migrate existing JSON data if it exists
-if os.path.exists('raffle_data.json'):
-    db_manager.migrate_from_json('raffle_data.json')
+# Initialize database with error handling
+try:
+    db_manager = DatabaseManager()
+    
+    # Migrate existing JSON data if it exists
+    if os.path.exists('raffle_data.json'):
+        db_manager.migrate_from_json('raffle_data.json')
+except Exception as e:
+    print(f"Database initialization warning: {e}")
+    # Create a fallback minimal database manager
+    db_manager = None
 
 # Security middleware
 @app.before_request
@@ -45,8 +53,11 @@ def security_headers():
 @app.after_request
 def after_request(response):
     # Add security headers
-    for header, value in app.config['SECURITY_HEADERS'].items():
-        response.headers[header] = value
+    try:
+        for header, value in app.config.get('SECURITY_HEADERS', {}).items():
+            response.headers[header] = value
+    except Exception as e:
+        print(f"Security headers warning: {e}")
     return response
 
 def allowed_file(filename):
@@ -75,36 +86,77 @@ def process_excel_file(filepath):
         for row in sheet.iter_rows(min_row=2, values_only=True):
             data.append([str(cell) if cell is not None else "" for cell in row])
         
-        # Common column name patterns that might contain employee names
-        name_patterns = ['name', 'caregiver', 'employee', 'staff']
-        
         employees = []
-        name_col_index = None
-        detected_name_column = None
+        first_name_col = None
+        last_name_col = None
+        full_name_col = None
+        detected_columns = []
         
-        # Find the name column by checking headers
+        # Look for first name and last name columns
         for i, header in enumerate(headers):
-            if header and any(pattern in header.lower() for pattern in name_patterns):
-                name_col_index = i
-                detected_name_column = header
-                break
+            header_lower = header.lower().strip()
+            if 'first' in header_lower and 'name' in header_lower:
+                first_name_col = i
+                detected_columns.append(f"First Name (Column {i+1})")
+            elif 'last' in header_lower and 'name' in header_lower:
+                last_name_col = i
+                detected_columns.append(f"Last Name (Column {i+1})")
+            elif ('full' in header_lower or 'employee' in header_lower or 'caregiver' in header_lower or 'staff' in header_lower) and 'name' in header_lower:
+                full_name_col = i
+                detected_columns.append(f"Full Name (Column {i+1})")
         
-        if name_col_index is not None:
-            # Extract names from the identified column
+        # If we found both first and last name columns, combine them
+        if first_name_col is not None and last_name_col is not None:
             for row in data:
-                if len(row) > name_col_index and row[name_col_index]:
-                    name = str(row[name_col_index]).strip()
-                    if (len(name) > 2 and len(name) < 50 and 
+                if (len(row) > max(first_name_col, last_name_col) and 
+                    row[first_name_col] and row[last_name_col]):
+                    
+                    first_name = str(row[first_name_col]).strip()
+                    last_name = str(row[last_name_col]).strip()
+                    
+                    if (first_name and last_name and 
+                        first_name.lower() not in ['none', 'null', 'nan', ''] and
+                        last_name.lower() not in ['none', 'null', 'nan', '']):
+                        
+                        full_name = f"{first_name} {last_name}"
+                        employees.append(full_name)
+        
+        # If we found a full name column, use that
+        elif full_name_col is not None:
+            for row in data:
+                if len(row) > full_name_col and row[full_name_col]:
+                    name = str(row[full_name_col]).strip()
+                    if (len(name) > 2 and len(name) < 100 and 
                         any(c.isalpha() for c in name) and 
                         name.lower() not in ['none', 'null', 'nan', '']):
                         employees.append(name)
-        else:
-            # If no obvious name column, check first few columns for potential names
-            for col_index in range(min(3, len(headers))):  # Check first 3 columns
+        
+        # If no obvious name columns found, check first few columns
+        elif not detected_columns:
+            # Common column name patterns that might contain employee names
+            name_patterns = ['name', 'caregiver', 'employee', 'staff']
+            
+            for i, header in enumerate(headers):
+                if header and any(pattern in header.lower() for pattern in name_patterns):
+                    full_name_col = i
+                    detected_columns.append(f"Name (Column {i+1}: {header})")
+                    break
+            
+            if full_name_col is not None:
                 for row in data:
-                    if len(row) > col_index and row[col_index]:
-                        potential_name = str(row[col_index]).strip()
-                        if (len(potential_name) > 2 and len(potential_name) < 50 and 
+                    if len(row) > full_name_col and row[full_name_col]:
+                        name = str(row[full_name_col]).strip()
+                        if (len(name) > 2 and len(name) < 100 and 
+                            any(c.isalpha() for c in name) and 
+                            name.lower() not in ['none', 'null', 'nan', '']):
+                            employees.append(name)
+            else:
+                # Last resort: check first column for names
+                detected_columns.append("First Column (assumed names)")
+                for row in data:
+                    if len(row) > 0 and row[0]:
+                        potential_name = str(row[0]).strip()
+                        if (len(potential_name) > 2 and len(potential_name) < 100 and 
                             any(c.isalpha() for c in potential_name) and
                             potential_name.lower() not in ['none', 'null', 'nan', '']):
                             employees.append(potential_name)
@@ -117,7 +169,8 @@ def process_excel_file(filepath):
             'employees': list(set(employees)),  # Remove duplicates
             'total_rows': len(data),
             'columns': headers,
-            'detected_name_column': detected_name_column
+            'detected_columns': detected_columns,
+            'employees_found': len(set(employees))
         }
         
     except Exception as e:
@@ -171,7 +224,23 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
+# Health check endpoint for deployment
+@app.route('/health')
+def health_check():
+    return jsonify({'status': 'healthy', 'message': 'Home Instead Raffle Dashboard is running'})
+
 @app.route('/')
+def index():
+    # Check if user is logged in
+    if 'access_token' in session:
+        try:
+            token_data = AuthManager.verify_token(session['access_token'])
+            if token_data:
+                return render_template('dashboard.html')
+        except:
+            pass
+    return redirect(url_for('login'))
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -181,7 +250,18 @@ def dashboard():
 @login_required
 def get_employees():
     try:
+        print("=== Get Employees API Debug ===")
         with db.get_connection() as conn:
+            # First check total count
+            count_cursor = conn.execute('SELECT COUNT(*) as total FROM employees')
+            total_count = count_cursor.fetchone()['total']
+            print(f"Total employees in DB: {total_count}")
+            
+            # Check active count
+            active_cursor = conn.execute('SELECT COUNT(*) as active FROM employees WHERE is_active = 1')
+            active_count = active_cursor.fetchone()['active']
+            print(f"Active employees in DB: {active_count}")
+            
             cursor = conn.execute('''
                 SELECT id, name, email, phone, department, position, 
                        hire_date, photo_path, total_entries, is_active,
@@ -203,9 +283,17 @@ def get_employees():
                 employee['activities'] = [dict(activity) for activity in activity_cursor.fetchall()]
                 employees.append(employee)
             
-            return jsonify({'success': True, 'employees': employees})
+            print(f"Returning {len(employees)} employees to frontend")
+            if len(employees) > 0:
+                print(f"First employee: {employees[0]['name']}")
+            
+            result = {'success': True, 'employees': employees}
+            return jsonify(result)
             
     except Exception as e:
+        print(f"Error in get_employees: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/employee', methods=['POST'])
@@ -457,19 +545,36 @@ def reset_all_data():
 @role_required('manager')
 @limiter.limit("5 per hour")
 def import_excel():
+    import traceback
+    filepath = None
+    
     try:
+        print("=== Excel Import Debug ===")
+        print(f"Request method: {request.method}")
+        print(f"Content type: {request.content_type}")
+        print(f"Files in request: {list(request.files.keys())}")
+        
         if 'file' not in request.files:
+            print("ERROR: No file in request")
             return jsonify({'success': False, 'error': 'No file uploaded'}), 400
         
         file = request.files['file']
+        print(f"File object: {file}")
+        print(f"Filename: {file.filename}")
+        
         if file.filename == '':
+            print("ERROR: Empty filename")
             return jsonify({'success': False, 'error': 'No file selected'}), 400
         
         if not allowed_file(file.filename):
+            print(f"ERROR: File type not allowed: {file.filename}")
             return jsonify({'success': False, 'error': 'Invalid file type. Please upload .xlsx or .xls files only'}), 400
         
         # Check file size
-        if len(file.read()) > app.config['MAX_FILE_SIZE']:
+        file_content = file.read()
+        print(f"File size: {len(file_content)} bytes")
+        if len(file_content) > app.config['MAX_FILE_SIZE']:
+            print(f"ERROR: File too large: {len(file_content)} > {app.config['MAX_FILE_SIZE']}")
             return jsonify({'success': False, 'error': 'File too large'}), 400
         file.seek(0)  # Reset file pointer
         
@@ -477,49 +582,83 @@ def import_excel():
         filename = secure_filename(file.filename)
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         safe_filename = f"{timestamp}_{filename}"
-        filepath = os.path.join(app.config['UPLOAD_PATH'], safe_filename)
+        
+        # Make sure upload directory exists
+        upload_dir = app.config['UPLOAD_PATH']
+        print(f"Upload directory: {upload_dir}")
+        if not os.path.exists(upload_dir):
+            print(f"Creating upload directory: {upload_dir}")
+            os.makedirs(upload_dir, exist_ok=True)
+        
+        filepath = os.path.join(upload_dir, safe_filename)
+        print(f"Saving file to: {filepath}")
         file.save(filepath)
+        print(f"File saved successfully, size: {os.path.getsize(filepath)} bytes")
         
         try:
             # Process the Excel file
+            print("Processing Excel file...")
             result = process_excel_file(filepath)
+            print(f"Excel processing result: {result}")
             
             if not result['success']:
+                print(f"Excel processing failed: {result.get('error', 'Unknown error')}")
                 return jsonify({'success': False, 'error': f'Failed to process Excel file: {result["error"]}'}), 400
+            
+            print(f"Found {len(result['employees'])} employees")
             
             # Import employees to database
             added_count = 0
             skipped_count = 0
             
+            print("Connecting to database...")
+            if db_manager is None:
+                print("ERROR: Database manager is None")
+                return jsonify({'success': False, 'error': 'Database not available'}), 500
+                
             with db.get_connection() as conn:
-                for employee_name in result['employees']:
+                print("Database connection established")
+                for i, employee_name in enumerate(result['employees']):
+                    print(f"Processing employee {i+1}/{len(result['employees'])}: {employee_name}")
+                    
                     # Check if employee already exists
                     cursor = conn.execute('SELECT id FROM employees WHERE name = ?', (employee_name,))
                     if cursor.fetchone():
+                        print(f"  Employee already exists: {employee_name}")
                         skipped_count += 1
                         continue
                     
                     # Insert new employee
+                    print(f"  Adding new employee: {employee_name}")
                     conn.execute('''
                         INSERT INTO employees (name, total_entries)
                         VALUES (?, ?)
                     ''', (employee_name, 0))
                     added_count += 1
                 
+                print(f"Committing database changes...")
                 conn.commit()
+                print(f"Database commit successful")
+            
+            print(f"Import complete: {added_count} added, {skipped_count} skipped")
             
             # Log the import
-            db.log_audit(
-                request.current_user['user_id'],
-                f"Excel import: {added_count} employees added",
-                "employees",
-                new_values={
-                    'filename': filename,
-                    'added': added_count,
-                    'skipped': skipped_count
-                },
-                ip_address=get_remote_address()
-            )
+            try:
+                print("Logging audit entry...")
+                db.log_audit(
+                    session.get('user_id'),
+                    f"Excel import: {added_count} employees added",
+                    "employees",
+                    new_values={
+                        'filename': filename,
+                        'added': added_count,
+                        'skipped': skipped_count
+                    },
+                    ip_address=get_remote_address()
+                )
+                print("Audit log entry created")
+            except Exception as audit_error:
+                print(f"Audit logging failed (non-critical): {audit_error}")
             
             return jsonify({
                 'success': True,
@@ -528,19 +667,37 @@ def import_excel():
                 'new_employees_added': added_count,
                 'existing_employees_skipped': skipped_count,
                 'file_info': {
-                    'total_rows': result['total_rows'],
-                    'columns': result['columns'],
-                    'detected_name_column': result['detected_name_column']
+                    'total_rows': result.get('total_rows', 0),
+                    'columns': result.get('columns', []),
+                    'detected_columns': result.get('detected_columns', [])
                 }
             })
             
         finally:
             # Clean up uploaded file
-            if os.path.exists(filepath):
-                os.remove(filepath)
+            if filepath and os.path.exists(filepath):
+                print(f"Cleaning up file: {filepath}")
+                try:
+                    os.remove(filepath)
+                    print("File cleanup successful")
+                except Exception as cleanup_error:
+                    print(f"File cleanup failed: {cleanup_error}")
         
     except Exception as e:
-        return jsonify({'success': False, 'error': f'An error occurred: {str(e)}'}), 500
+        error_msg = f'An error occurred: {str(e)}'
+        print(f"ERROR: {error_msg}")
+        print("Traceback:")
+        traceback.print_exc()
+        
+        # Clean up file on error
+        if filepath and os.path.exists(filepath):
+            try:
+                os.remove(filepath)
+                print("Error cleanup: File removed")
+            except:
+                print("Error cleanup: Failed to remove file")
+        
+        return jsonify({'success': False, 'error': error_msg}), 500
 
 # New professional endpoints
 @app.route('/api/raffle/conduct', methods=['POST'])

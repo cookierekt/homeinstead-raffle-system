@@ -106,8 +106,8 @@ SMTP_PASS=your-app-password
     with open(env_path, 'w') as f:
         f.write(env_content)
     
-    print(f"✅ Created secure environment configuration in {env_path}")
-    print("⚠️  IMPORTANT: Change the default secrets before deploying to production!")
+    print(f"Created secure environment configuration in {env_path}")
+    print("IMPORTANT: Change the default secrets before deploying to production!")
     
     return True
 
@@ -129,7 +129,7 @@ def setup_directories():
             with open(gitkeep_path, 'w') as f:
                 f.write('')
     
-    print("✅ Created necessary directories")
+    print("Created necessary directories")
     return True
 
 def setup_database():
@@ -149,16 +149,16 @@ def setup_database():
             # Backup the JSON file
             backup_name = f"raffle_data.json.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             os.rename('raffle_data.json', backup_name)
-            print(f"✅ JSON data migrated. Original backed up to {backup_name}")
+            print(f"JSON data migrated. Original backed up to {backup_name}")
         
-        print("✅ Database initialized successfully")
-        print("📋 Default admin login: admin@homeinstead.com / admin123")
-        print("⚠️  CHANGE THE DEFAULT ADMIN PASSWORD IMMEDIATELY!")
+        print("Database initialized successfully")
+        print("Default admin login: admin@homeinstead.com / admin123")
+        print("CHANGE THE DEFAULT ADMIN PASSWORD IMMEDIATELY!")
         
         return True
         
     except Exception as e:
-        print(f"❌ Database setup failed: {e}")
+        print(f"Database setup failed: {e}")
         return False
 
 def test_application():
@@ -171,28 +171,28 @@ def test_application():
         from database import db
         from auth import AuthManager
         
-        print("✅ All modules imported successfully")
-        print("✅ Application setup complete!")
+        print("All modules imported successfully")
+        print("Application setup complete!")
         
         return True
         
     except Exception as e:
-        print(f"❌ Application test failed: {e}")
+        print(f"Application test failed: {e}")
         return False
 
 def main():
     """Main setup function"""
-    print("🏠 Home Instead Raffle Dashboard - Professional Setup")
+    print("Home Instead Raffle Dashboard - Professional Setup")
     print("=" * 60)
     print("Setting up your secure, production-ready raffle dashboard...")
     print()
     
     # Check Python version
     if sys.version_info < (3, 7):
-        print("❌ Python 3.7+ is required")
+        print("Python 3.7+ is required")
         return False
     
-    print(f"✅ Python {sys.version.split()[0]} detected")
+    print(f"Python {sys.version.split()[0]} detected")
     
     # Setup steps
     steps = [
@@ -204,13 +204,13 @@ def main():
     ]
     
     for step_name, step_func in steps:
-        print(f"\n📋 {step_name}...")
+        print(f"\n{step_name}...")
         if not step_func():
-            print(f"❌ Setup failed at: {step_name}")
+            print(f"Setup failed at: {step_name}")
             return False
     
     print("\n" + "=" * 60)
-    print("🎉 SETUP COMPLETE!")
+    print("SETUP COMPLETE!")
     print("=" * 60)
     print()
     print("Your professional raffle dashboard is ready!")
@@ -221,30 +221,30 @@ def main():
     print("3. Start the application: python app.py")
     print("4. Visit http://localhost:5000 to access the dashboard")
     print()
-    print("🔒 Security Features Enabled:")
-    print("   • Secure authentication with JWT tokens")
-    print("   • Password hashing with bcrypt")
-    print("   • Rate limiting on login attempts")
-    print("   • SQL injection protection")
-    print("   • CSRF protection")
-    print("   • Audit logging")
-    print("   • Encrypted data storage")
+    print("Security Features Enabled:")
+    print("   - Secure authentication with JWT tokens")
+    print("   - Password hashing with bcrypt")
+    print("   - Rate limiting on login attempts")
+    print("   - SQL injection protection")
+    print("   - CSRF protection")
+    print("   - Audit logging")
+    print("   - Encrypted data storage")
     print()
-    print("💼 Professional Features:")
-    print("   • Employee management with photos")
-    print("   • Advanced raffle system")
-    print("   • Excel import/export")
-    print("   • Analytics dashboard")
-    print("   • PDF report generation")
-    print("   • Automated backups")
+    print("Professional Features:")
+    print("   - Employee management with photos")
+    print("   - Advanced raffle system")
+    print("   - Excel import/export")
+    print("   - Analytics dashboard")
+    print("   - PDF report generation")
+    print("   - Automated backups")
     print()
-    print("🌐 Free hosting options:")
-    print("   • Render.com (recommended)")
-    print("   • Railway.app")
-    print("   • Vercel")
-    print("   • Heroku")
+    print("Free hosting options:")
+    print("   - Render.com (recommended)")
+    print("   - Railway.app")
+    print("   - Vercel")
+    print("   - Heroku")
     print()
-    print("📧 For support, check the README.md file")
+    print("For support, check the README.md file")
     
     return True
 

@@ -160,15 +160,15 @@ class DatabaseManager:
         cursor = conn.execute('SELECT COUNT(*) FROM users')
         if cursor.fetchone()[0] == 0:
             # Create default admin user
-            password = 'admin123'  # Should be changed immediately in production
+            password = 'Homeinstead3042'  # Should be changed immediately in production
             password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
             
             conn.execute('''
                 INSERT INTO users (email, password_hash, role, name)
                 VALUES (?, ?, ?, ?)
-            ''', ('admin@homeinstead.com', password_hash, 'admin', 'Administrator'))
+            ''', ('homecare@homeinstead.com', password_hash, 'admin', 'Administrator'))
             
-            print("Default admin user created: admin@homeinstead.com / admin123")
+            print("Default admin user created: homecare@homeinstead.com / Homeinstead3042")
             print("IMPORTANT: Change this password immediately!")
     
     def migrate_from_json(self, json_file_path: str):

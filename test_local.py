@@ -5,15 +5,15 @@ print("Python is working!")
 
 try:
     from flask import Flask
-    print("✅ Flask is available")
+    print("Flask is available")
 except ImportError:
-    print("❌ Flask not installed - run: pip install -r requirements.txt")
+    print("Flask not installed - run: pip install -r requirements.txt")
 
 try:
     from openpyxl import load_workbook
-    print("✅ openpyxl is available")
+    print("openpyxl is available")
 except ImportError:
-    print("❌ openpyxl not installed - run: pip install -r requirements.txt")
+    print("openpyxl not installed - run: pip install -r requirements.txt")
 
 print("\nIf you see checkmarks above, you can run:")
 print("python app.py")
